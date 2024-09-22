@@ -64,17 +64,17 @@ fn main() -> Result<(), i32> {
         }
     }
 
-    let r = unsafe {
-        Command::new("/var/lib/flatpak/exports/bin/info.beyondallreason.bar")
-            .pre_exec(|| {
-                nix::unistd::setsid().map_err(|_| io::Error::from(io::ErrorKind::Other))?;
-                Ok(())
-            })
-            .spawn()
-    };
-    if r.is_err() {
-        eprintln!("Failed to spawn process");
-    }
+    //let r = unsafe {
+    //    Command::new("/var/lib/flatpak/exports/bin/info.beyondallreason.bar")
+    //        .pre_exec(|| {
+    //            nix::unistd::setsid().map_err(|_| io::Error::from(io::ErrorKind::Other))?;
+    //            Ok(())
+    //        })
+    //        .spawn()
+    //};
+    //if r.is_err() {
+    //    eprintln!("Failed to spawn process");
+    //}
 
     Ok(())
 }
