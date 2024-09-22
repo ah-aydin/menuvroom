@@ -1,7 +1,8 @@
 static CONFIG_FILE_SUB_PATH: &'static str = "/.config/rmenu/config.json";
 static DEFAULT_CONFIG: &'static str = r#"
 {
-  "extra_directories": []
+  "extra_directories": [],
+  "ignored_directories": []
 }
 "#;
 
@@ -17,6 +18,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub extra_directories: Vec<String>,
+    pub ignored_directories: Vec<String>,
 }
 
 pub fn load_config() -> Config {
