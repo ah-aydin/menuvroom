@@ -1,6 +1,11 @@
 mod config;
 
-use std::{env, fs, io, os::unix::fs::PermissionsExt, path::Path, process};
+use std::{
+    env, fs, io,
+    os::unix::{fs::PermissionsExt, process::CommandExt},
+    path::Path,
+    process::{self, Command},
+};
 
 use config::{load_config, Config};
 
@@ -57,6 +62,18 @@ fn main() -> Result<(), i32> {
         if list_executables(&path).is_err() {
             eprintln!("Failed to read executables files in {path}");
         }
+    }
+
+    let r = unsafe {
+        Command::new("/var/lib/flatpak/exports/bin/info.beyondallreason.bar")
+            .pre_exec(|| {
+                nix::unistd::setsid().map_err(|_| io::Error::from(io::ErrorKind::Other))?;
+                Ok(())
+            })
+            .spawn()
+    };
+    if r.is_err() {
+        eprintln!("Failed to spawn process");
     }
 
     Ok(())
