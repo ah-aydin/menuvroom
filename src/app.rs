@@ -4,6 +4,7 @@ use dioxus::desktop::{Config, WindowBuilder};
 use dioxus::prelude::*;
 use dioxus_desktop::tao::dpi::LogicalPosition;
 use dioxus_desktop::tao::dpi::LogicalSize;
+use display_info::DisplayInfo;
 
 fn Stories() -> Element {
     rsx! {
@@ -31,17 +32,43 @@ fn App() -> Element {
     }
 }
 
-pub fn window_main() {
+pub fn app_main() {
+    let display_infos = match DisplayInfo::all() {
+        Ok(display_infos) => display_infos,
+        Err(err) => {
+            eprintln!("Failed to get display informations");
+            eprintln!("{:?}", err);
+            std::process::exit(1);
+        }
+    };
+    let primary_displays = display_infos
+        .iter()
+        .filter(|display_info| display_info.is_primary)
+        .collect::<Vec<&DisplayInfo>>();
+    let primary_display_info = match primary_displays.first() {
+        Some(display_info) => display_info,
+        None => {
+            eprintln!("Failed to locate primary display. {:?}", display_infos);
+            std::process::exit(1);
+        }
+    };
+
+    let display_width = primary_display_info.width;
+    let display_height = primary_display_info.height;
+
+    let window_width = (display_width as f32 * 0.75) as u32;
+    let window_height = (display_height as f32 * 0.75) as u32;
+    let window_pos_x = (display_width - window_width) / 2;
+    let window_pos_y = (display_height - window_height) / 2;
+
     LaunchBuilder::desktop()
         .with_cfg(
             Config::new()
                 .with_window(
                     WindowBuilder::new()
                         .with_title("menuvroom")
-                        // TODO compute size according to display resolution
-                        .with_inner_size(LogicalSize::new(800, 600))
-                        // TODO compute position according to the window size and display resolution
-                        .with_position(LogicalPosition::new(300, 200))
+                        .with_inner_size(LogicalSize::new(window_width, window_height))
+                        .with_position(LogicalPosition::new(window_pos_x, window_pos_y))
                         .with_focused(true)
                         .with_decorations(false)
                         .with_transparent(false)

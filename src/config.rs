@@ -1,4 +1,4 @@
-static CONFIG_FILE_SUB_PATH: &'static str = "/.config/rmenu/config.json";
+static CONFIG_FILE_SUB_PATH: &'static str = "/.config/menuvroom/config.json";
 static DEFAULT_CONFIG: &'static str = r#"
 {
   "extra_directories": [],

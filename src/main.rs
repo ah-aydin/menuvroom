@@ -1,5 +1,5 @@
+mod app;
 mod config;
-mod window;
 
 use std::{
     env, fs, io,
@@ -8,8 +8,8 @@ use std::{
     process::{self, Command},
 };
 
+use app::app_main;
 use config::{load_config, Config};
-use window::window_main;
 
 fn get_binary_dirs(config: &Config) -> Vec<String> {
     let path_var = match env::var("PATH") {
@@ -66,7 +66,7 @@ fn main() -> Result<(), i32> {
         }
     }
 
-    window_main();
+    app_main();
 
     //let r = unsafe {
     //    Command::new("/var/lib/flatpak/exports/bin/info.beyondallreason.bar")
