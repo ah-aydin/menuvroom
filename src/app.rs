@@ -58,7 +58,7 @@ pub fn app_main() {
 
     let window_width = (display_width as f32 * 0.75) as u32;
     let window_height = (display_height as f32 * 0.75) as u32;
-    let window_pos_x = (display_width - window_width) / 2;
+    let window_pos_x = (display_width - window_width )/ 2;
     let window_pos_y = (display_height - window_height) / 2;
 
     LaunchBuilder::desktop()
