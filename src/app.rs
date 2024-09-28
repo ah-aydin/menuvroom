@@ -36,8 +36,8 @@ pub fn app_main() {
     let display_infos = match DisplayInfo::all() {
         Ok(display_infos) => display_infos,
         Err(err) => {
-            eprintln!("Failed to get display informations");
-            eprintln!("{:?}", err);
+            println!("Failed to get display informations");
+            println!("{:?}", err);
             std::process::exit(1);
         }
     };
@@ -48,7 +48,7 @@ pub fn app_main() {
     let primary_display_info = match primary_displays.first() {
         Some(display_info) => display_info,
         None => {
-            eprintln!("Failed to locate primary display. {:?}", display_infos);
+            println!("Failed to locate primary display. {:?}", display_infos);
             std::process::exit(1);
         }
     };

@@ -2,7 +2,7 @@ mod app;
 mod config;
 
 use std::{
-    env, fs, io,
+    env, fs,
     os::unix::{fs::PermissionsExt, process::CommandExt},
     path::Path,
     process::{self, Command},
@@ -38,17 +38,45 @@ fn get_binary_dirs(config: &Config) -> Vec<String> {
 }
 
 // TODO improve error handling
-fn list_executables(dir: &str) -> io::Result<()> {
+fn list_executables(dir: &str) -> Result<(), ()> {
+    println!("Collecting from dir: {}", dir);
+
     let path = Path::new(dir);
-    for entry in fs::read_dir(path)? {
-        let entry = entry?;
-        let file_type = entry.file_type()?;
+    let entries = fs::read_dir(path);
+    if entries.is_err() {
+        println!("Failed to read entries in '{}'", dir);
+        return Err(());
+    }
+    let entries = entries.unwrap();
 
-        if file_type.is_file() {
-            let metadata = entry.metadata()?;
+    for entry in entries {
+        if entry.is_err() {
+            println!(
+                "Failed to read details about entry '{:?}'",
+                entry.err().unwrap()
+            );
+            continue;
+        }
+        let entry = entry.unwrap();
+
+        let file_type = entry.file_type();
+        if file_type.is_err() {
+            println!("Could not get filetype of '{:?}'", entry);
+            continue;
+        }
+        let file_type = file_type.unwrap();
+
+        if file_type.is_file() || file_type.is_symlink() {
+            let metadata = entry.metadata();
+            if metadata.is_err() {
+                println!("Failed to read metadata of entry '{:?}'", entry);
+                continue;
+            }
+
+            let metadata = metadata.unwrap();
             let permissions = metadata.permissions();
-
             if permissions.mode() & 0o100 != 0 {
+                // TODO instead of printing them out, collect them into a list
                 println!("{}", entry.path().display());
             }
         }
@@ -62,7 +90,7 @@ fn main() -> Result<(), i32> {
 
     for path in &paths {
         if list_executables(&path).is_err() {
-            eprintln!("Failed to read executables files in {path}");
+            println!("Failed to read executables files in {path}");
         }
     }
 
