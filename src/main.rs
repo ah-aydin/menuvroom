@@ -90,6 +90,7 @@ fn main() -> Result<(), i32> {
     let config = load_config();
     let paths = get_binary_dirs(&config);
 
+    // TODO introduce caching
     let executables: Vec<Executable> = paths
         .iter()
         .map(|path| get_executables(path))
@@ -105,8 +106,6 @@ fn main() -> Result<(), i32> {
             executable.get_display_name()
         );
     }
-
-    println!("Done");
 
     app_main();
 
