@@ -6,28 +6,28 @@ use dioxus_desktop::tao::dpi::LogicalPosition;
 use dioxus_desktop::tao::dpi::LogicalSize;
 use display_info::DisplayInfo;
 
-fn Stories() -> Element {
+fn SearchBox() -> Element {
     rsx! {
-        h2 { "stories" }
+        h2 {"Search box"}
     }
 }
 
-fn Preview() -> Element {
+fn ExecutablesList() -> Element {
     rsx! {
-        h2 { "preview" }
+        ul {
+            li {"Item 1"}
+            li {"Item 2"}
+            li {"Item 3"}
+            li {"Item 4"}
+        }
     }
 }
 
 fn App() -> Element {
-    eval(
-        r#"
-        document.addEventListener('contextmenu', event => event.preventDefault());
-        "#,
-    );
     rsx! {
-        div { display: "flex", flex_direction: "row", width: "100%",
-            div { width: "50%", Stories {} }
-            div { width: "50%", Preview {} }
+        div { display: "flex", flex_direction: "column", width: "100%",
+            div { height: "20%", width: "100%" , SearchBox {} }
+            div { height: "80%", ExecutablesList {} }
         }
     }
 }
@@ -58,7 +58,7 @@ pub fn app_main() {
 
     let window_width = (display_width as f32 * 0.75) as u32;
     let window_height = (display_height as f32 * 0.75) as u32;
-    let window_pos_x = (display_width - window_width )/ 2;
+    let window_pos_x = (display_width - window_width) / 2;
     let window_pos_y = (display_height - window_height) / 2;
 
     LaunchBuilder::desktop()
@@ -78,7 +78,7 @@ pub fn app_main() {
                         .with_closable(true)
                         .with_minimizable(false)
                         .with_maximized(false)
-                        .with_theme(None),
+                        .with_theme(Some(dioxus_desktop::tao::window::Theme::Dark)),
                 )
                 .with_menu(None),
         )

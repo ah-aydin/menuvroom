@@ -1,5 +1,6 @@
 mod app;
 mod config;
+mod executable;
 
 use std::{
     env, fs,
@@ -10,6 +11,7 @@ use std::{
 
 use app::app_main;
 use config::{load_config, Config};
+use executable::Executable;
 
 fn get_binary_dirs(config: &Config) -> Vec<String> {
     let path_var = match env::var("PATH") {
@@ -37,8 +39,7 @@ fn get_binary_dirs(config: &Config) -> Vec<String> {
     paths
 }
 
-// TODO improve error handling
-fn list_executables(dir: &str) -> Result<(), ()> {
+fn get_executables(dir: &str) -> Result<Vec<Executable>, ()> {
     println!("Collecting from dir: {}", dir);
 
     let path = Path::new(dir);
@@ -48,6 +49,8 @@ fn list_executables(dir: &str) -> Result<(), ()> {
         return Err(());
     }
     let entries = entries.unwrap();
+
+    let mut executables = Vec::with_capacity(entries.size_hint().0);
 
     for entry in entries {
         if entry.is_err() {
@@ -76,23 +79,34 @@ fn list_executables(dir: &str) -> Result<(), ()> {
             let metadata = metadata.unwrap();
             let permissions = metadata.permissions();
             if permissions.mode() & 0o100 != 0 {
-                // TODO instead of printing them out, collect them into a list
-                println!("{}", entry.path().display());
+                executables.push(Executable::new(format!("{}", entry.path().display())));
             }
         }
     }
-    Ok(())
+    Ok(executables)
 }
 
 fn main() -> Result<(), i32> {
     let config = load_config();
     let paths = get_binary_dirs(&config);
 
-    for path in &paths {
-        if list_executables(&path).is_err() {
-            println!("Failed to read executables files in {path}");
-        }
+    let executables: Vec<Executable> = paths
+        .iter()
+        .map(|path| get_executables(path))
+        .filter(|executables_result| executables_result.is_ok())
+        .map(|executable_result| executable_result.unwrap())
+        .flatten()
+        .collect();
+
+    for executable in executables {
+        println!(
+            "{} || {}",
+            executable.file_path,
+            executable.get_display_name()
+        );
     }
+
+    println!("Done");
 
     app_main();
 
@@ -105,7 +119,7 @@ fn main() -> Result<(), i32> {
     //        .spawn()
     //};
     //if r.is_err() {
-    //    eprintln!("Failed to spawn process");
+    //    println!("Failed to spawn process");
     //}
 
     Ok(())
