@@ -1,4 +1,5 @@
 use display_info::DisplayInfo;
+use log::info;
 use winit::{
     application::ApplicationHandler,
     dpi::{PhysicalPosition, PhysicalSize, Position, Size},
@@ -82,7 +83,7 @@ impl ApplicationHandler for App {
                 event,
                 is_synthetic: _,
             } => {
-                println!("Keyboard: {:?}", event.physical_key);
+                info!("Keyboard: {:?}", event.physical_key);
             }
 
             _ => {}

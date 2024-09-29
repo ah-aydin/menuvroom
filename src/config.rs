@@ -13,6 +13,7 @@ use std::{
     process,
 };
 
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -24,7 +25,7 @@ pub struct Config {
 pub fn load_config() -> Config {
     let home_var = env::var("HOME");
     if home_var.is_err() {
-        eprintln!("Failed to read HOME from environment");
+        error!("Failed to read HOME from environment");
         process::exit(1);
     }
 
@@ -33,18 +34,18 @@ pub fn load_config() -> Config {
     // Create config file with default contents if it doesn't exist
     let config_file_path = Path::new(&config_file);
     if !config_file_path.exists() {
-        println!("Config file missing, creating new config file with default contents");
+        info!("Config file missing, creating new config file with default contents");
 
         match config_file_path.parent() {
             Some(parent) => match fs::create_dir_all(parent) {
                 Err(_) => {
-                    eprintln!("Failed to create missing parent directory for '{config_file}'");
+                    error!("Failed to create missing parent directory for '{config_file}'");
                     process::exit(1);
                 }
                 _ => {}
             },
             None => {
-                eprintln!("Could not get the parent directory for '{config_file}'");
+                error!("Could not get the parent directory for '{config_file}'");
                 process::exit(1);
             }
         };
@@ -56,14 +57,14 @@ pub fn load_config() -> Config {
         {
             Ok(file) => file,
             Err(_) => {
-                println!("Failed to create missing config file '{config_file}'");
+                error!("Failed to create missing config file '{config_file}'");
                 process::exit(1);
             }
         };
 
         match file.write_all(DEFAULT_CONFIG.as_bytes()) {
             Err(_) => {
-                eprintln!("Failed to write default contents to newly created config file");
+                error!("Failed to write default contents to newly created config file");
                 process::exit(1);
             }
             _ => {}
@@ -74,7 +75,7 @@ pub fn load_config() -> Config {
     let file = match std::fs::File::open(&config_file) {
         Ok(file) => file,
         Err(_) => {
-            eprintln!("Could not open config file '{}'", config_file);
+            error!("Could not open config file '{}'", config_file);
             process::exit(1);
         }
     };
@@ -87,7 +88,7 @@ pub fn load_config() -> Config {
     {
         Some(acc) => acc,
         None => {
-            eprintln!("Failed to read config file");
+            error!("Failed to read config file");
             process::exit(1);
         }
     };
@@ -96,7 +97,7 @@ pub fn load_config() -> Config {
     match config {
         Ok(config) => config,
         Err(err) => {
-            eprintln!("Failed to parse config file: {:?}", err);
+            error!("Failed to parse config file: {:?}", err);
             process::exit(1);
         }
     }

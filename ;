@@ -65,7 +65,7 @@ fn get_executables(dir: &str) -> Result<Vec<Executable>, ()> {
 
         let file_type = entry.file_type();
         if file_type.is_err() {
-            error!("Could not get filetype of '{:?}'", entry);
+            info!("Could not get filetype of '{:?}'", entry);
             continue;
         }
         let file_type = file_type.unwrap();
