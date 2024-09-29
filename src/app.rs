@@ -8,12 +8,17 @@ use winit::{
     window::Window,
 };
 
-struct App {
-    window: Option<Window>,
+use crate::executable::Executable;
+
+struct WindowOptions {
+    window_width: u32,
+    window_height: u32,
+    window_pos_x: i32,
+    window_pos_y: i32,
 }
 
-impl ApplicationHandler for App {
-    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+impl WindowOptions {
+    fn new() -> Self {
         let display_infos = match DisplayInfo::all() {
             Ok(display_infos) => display_infos,
             Err(err) => {
@@ -39,20 +44,38 @@ impl ApplicationHandler for App {
 
         let window_width = (display_width as f32 * 0.75) as u32;
         let window_height = (display_height as f32 * 0.75) as u32;
-        let window_pos_x = (display_width - window_width) / 2;
-        let window_pos_y = (display_height - window_height) / 2;
+        let window_pos_x = ((display_width - window_width) / 2) as i32;
+        let window_pos_y = ((display_height - window_height) / 2) as i32;
 
+        Self {
+            window_width,
+            window_height,
+            window_pos_x,
+            window_pos_y,
+        }
+    }
+}
+
+struct App {
+    window: Option<Window>,
+
+    window_options: WindowOptions,
+    executables: Vec<Executable>,
+}
+
+impl ApplicationHandler for App {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         self.window = Some(
             event_loop
                 .create_window(
                     Window::default_attributes()
                         .with_inner_size(Size::Physical(PhysicalSize::new(
-                            window_width,
-                            window_height,
+                            self.window_options.window_width,
+                            self.window_options.window_height,
                         )))
                         .with_position(Position::Physical(PhysicalPosition::new(
-                            window_pos_x as i32,
-                            window_pos_y as i32,
+                            self.window_options.window_pos_x,
+                            self.window_options.window_pos_y,
                         )))
                         .with_resizable(false)
                         .with_decorations(false)
@@ -91,11 +114,15 @@ impl ApplicationHandler for App {
     }
 }
 
-pub fn app_main() {
+pub fn app_main(executables: Vec<Executable>) {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Wait);
 
-    let mut app = App { window: None };
+    let mut app = App {
+        window: None,
+        window_options: WindowOptions::new(),
+        executables,
+    };
 
     event_loop.run_app(&mut app).unwrap();
 }

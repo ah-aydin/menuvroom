@@ -102,15 +102,7 @@ fn main() -> Result<(), i32> {
         .flatten()
         .collect();
 
-    for executable in executables {
-        info!(
-            "{} || {}",
-            executable.file_path,
-            executable.get_display_name()
-        );
-    }
-
-    app_main();
+    app_main(executables);
 
     //let r = unsafe {
     //    Command::new("/var/lib/flatpak/exports/bin/info.beyondallreason.bar")
