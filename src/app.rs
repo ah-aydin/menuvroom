@@ -7,6 +7,7 @@ use winit::{
     dpi::{PhysicalPosition, PhysicalSize, Position, Size},
     event::WindowEvent,
     event_loop::{ControlFlow, EventLoop},
+    keyboard::NamedKey,
     window::Window,
 };
 
@@ -212,10 +213,10 @@ impl<'window> Renderer<'window> {
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 1.0,
-                        g: 0.0,
-                        b: 0.0,
-                        a: 1.0,
+                        r: 0.15,
+                        g: 0.15,
+                        b: 0.15,
+                        a: 0.8,
                     }),
                     store: wgpu::StoreOp::Store,
                 },
@@ -238,9 +239,31 @@ impl<'window> Renderer<'window> {
     }
 }
 
+struct AppState {
+    search_entry: String,
+}
+
+impl AppState {
+    fn new() -> Self {
+        Self {
+            search_entry: String::with_capacity(255),
+        }
+    }
+
+    fn append_to_search(&mut self, s: &str) {
+        self.search_entry.push_str(s);
+    }
+
+    fn search_backspace(&mut self) {
+        self.search_entry.pop();
+    }
+}
+
 struct App<'window> {
     window: Option<Arc<Window>>,
     renderer: Option<Renderer<'window>>,
+
+    state: AppState,
 
     window_options: WindowOptions,
     _executables: Vec<Executable>,
@@ -264,7 +287,7 @@ impl<'window> ApplicationHandler for App<'window> {
                             .with_resizable(false)
                             .with_decorations(false)
                             .with_title("MenuVroom")
-                            .with_transparent(false),
+                            .with_transparent(true),
                     )
                     .unwrap(),
             );
@@ -301,7 +324,24 @@ impl<'window> ApplicationHandler for App<'window> {
                 event,
                 is_synthetic: _,
             } => {
-                info!("Keyboard: {:?}", event.physical_key);
+                if event.state.is_pressed() {
+                    match event.logical_key {
+                        winit::keyboard::Key::Named(NamedKey::Enter) => {
+                            info!("Pressed the enter key. TODO open up the selected app");
+                        }
+                        winit::keyboard::Key::Named(NamedKey::Backspace) => {
+                            self.state.search_backspace()
+                        }
+                        winit::keyboard::Key::Named(NamedKey::Space) => {
+                            self.state.append_to_search(" ")
+                        }
+                        winit::keyboard::Key::Character(c) => {
+                            self.state.append_to_search(c.as_str())
+                        }
+                        _ => {}
+                    };
+                    info!("Search: {}", self.state.search_entry);
+                }
             }
 
             _ => {}
@@ -316,6 +356,8 @@ pub fn app_main(executables: Vec<Executable>) {
     let mut app = App {
         window: None,
         renderer: None,
+
+        state: AppState::new(),
 
         window_options: WindowOptions::new(),
         _executables: executables,
