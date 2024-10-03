@@ -1,6 +1,6 @@
 mod window_options;
 
-use std::sync::Arc;
+use std::{io, os::unix::process::CommandExt, process::Command, sync::Arc};
 
 use glyphon::TextArea;
 use log::info;
@@ -18,12 +18,14 @@ use crate::executable::Executable;
 
 struct AppState {
     search_entry: String,
+    executables: Vec<Executable>,
 }
 
 impl AppState {
-    fn new() -> Self {
+    fn new(executables: Vec<Executable>) -> Self {
         Self {
             search_entry: String::with_capacity(255),
+            executables,
         }
     }
 
@@ -141,7 +143,6 @@ struct App {
     state: AppState,
     window_state: Option<WindowState>,
     window_options: WindowOptions,
-    _executables: Vec<Executable>,
 }
 
 impl ApplicationHandler for App {
@@ -193,6 +194,8 @@ impl ApplicationHandler for App {
             ..
         } = state;
 
+        let AppState { search_entry, .. } = &self.state;
+
         match event {
             WindowEvent::CloseRequested => {
                 event_loop.exit();
@@ -208,7 +211,7 @@ impl ApplicationHandler for App {
                 );
                 text_buffer.set_text(
                     font_system,
-                    self.state.search_entry.as_str(),
+                    search_entry.as_str(),
                     glyphon::Attrs::new().family(glyphon::Family::Monospace),
                     glyphon::Shaping::Advanced,
                 );
@@ -282,7 +285,32 @@ impl ApplicationHandler for App {
                 if event.state.is_pressed() {
                     match event.logical_key {
                         winit::keyboard::Key::Named(NamedKey::Enter) => {
-                            info!("Pressed the enter key. TODO open up the selected app");
+                            let mut scored_executables: Vec<(Executable, f64)> =
+                                Vec::with_capacity(self.state.executables.len());
+                            for executable in &self.state.executables {
+                                let display_name = executable.get_display_name();
+                                let score;
+                                if display_name.contains(&self.state.search_entry) {
+                                    score = 1.0;
+                                } else {
+                                    score = strsim::sorensen_dice(
+                                        &self.state.search_entry,
+                                        display_name,
+                                    )
+                                    .abs();
+                                }
+                                scored_executables.push((executable.clone(), score));
+                            }
+
+                            scored_executables.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+                            let scored_executables: Vec<(Executable, f64)> =
+                                scored_executables.into_iter().rev().take(10).collect();
+                            info!("The executables are:");
+                            scored_executables.iter().for_each(|(a, b)| {
+                                info!("{} - Score: {}", a.get_display_name(), b)
+                            });
+                            run_executable(&scored_executables[0].0.file_path);
+                            event_loop.exit();
                         }
                         winit::keyboard::Key::Named(NamedKey::Backspace) => {
                             self.state.search_backspace()
@@ -295,6 +323,7 @@ impl ApplicationHandler for App {
                         }
                         _ => {}
                     };
+
                     window.request_redraw();
                 }
             }
@@ -309,11 +338,24 @@ pub fn app_main(executables: Vec<Executable>) {
     event_loop.set_control_flow(ControlFlow::Wait);
 
     let mut app = App {
-        state: AppState::new(),
+        state: AppState::new(executables),
         window_state: None,
         window_options: WindowOptions::new(),
-        _executables: executables,
     };
 
     event_loop.run_app(&mut app).unwrap();
+}
+
+fn run_executable(command: &str) {
+    let r = unsafe {
+        Command::new(command)
+            .pre_exec(|| {
+                nix::unistd::setsid().map_err(|_| io::Error::from(io::ErrorKind::Other))?;
+                Ok(())
+            })
+            .spawn()
+    };
+    if r.is_err() {
+        info!("Failed to spawn process");
+    }
 }

@@ -1,3 +1,4 @@
+#[derive(Debug, Clone)]
 pub struct Executable {
     pub file_path: String,
     display_name_index: usize,
