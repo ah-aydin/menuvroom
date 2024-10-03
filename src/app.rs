@@ -206,13 +206,13 @@ impl ApplicationHandler for App {
                         height: surface_config.height,
                     },
                 );
+                text_buffer.set_text(
+                    font_system,
+                    self.state.search_entry.as_str(),
+                    glyphon::Attrs::new().family(glyphon::Family::Monospace),
+                    glyphon::Shaping::Advanced,
+                );
 
-                //text_buffer.set_text(
-                //    font_system,
-                //    &self.state.search_entry,
-                //    glyphon::Attrs::new().family(glyphon::Family::Monospace),
-                //    glyphon::Shaping::Advanced,
-                //);
                 text_renderer
                     .prepare(
                         device,
@@ -272,8 +272,6 @@ impl ApplicationHandler for App {
 
                 queue.submit(Some(encoder.finish()));
                 frame.present();
-
-                //self.window_state.as_ref().unwrap().window.request_redraw();
             }
 
             WindowEvent::KeyboardInput {
@@ -297,7 +295,7 @@ impl ApplicationHandler for App {
                         }
                         _ => {}
                     };
-                    info!("Search: {}", self.state.search_entry);
+                    window.request_redraw();
                 }
             }
 
