@@ -19,22 +19,86 @@ use crate::executable::Executable;
 struct AppState {
     search_entry: String,
     executables: Vec<Executable>,
+    matching_executable_indexes: Vec<usize>,
+    selected_index: usize,
+    ctrl_pressed: bool,
 }
 
 impl AppState {
     fn new(executables: Vec<Executable>) -> Self {
         Self {
             search_entry: String::with_capacity(255),
+            matching_executable_indexes: Vec::with_capacity(8),
             executables,
+            selected_index: 0,
+            ctrl_pressed: false,
         }
     }
 
     fn append_to_search(&mut self, s: &str) {
         self.search_entry.push_str(s);
+        self.update_matching_executable_indexes();
     }
 
     fn search_backspace(&mut self) {
         self.search_entry.pop();
+        self.update_matching_executable_indexes();
+    }
+
+    fn update_matching_executable_indexes(&mut self) {
+        self.selected_index = 0;
+        self.matching_executable_indexes.clear();
+
+        for i in 0..self.executables.len() {
+            let display_name = self.executables[i].get_display_name();
+            if display_name == &self.search_entry {
+                self.matching_executable_indexes.insert(0, i);
+            }
+            if display_name.contains(&self.search_entry) {
+                self.matching_executable_indexes.push(i);
+            }
+            if self.matching_executable_indexes.len() >= 8 {
+                break;
+            }
+        }
+
+        info!("The executables are:");
+        let mut c = 0;
+        for i in &self.matching_executable_indexes {
+            info!(
+                "{}: {} - {}",
+                c,
+                self.executables[*i].get_display_name(),
+                self.executables[*i].file_path
+            );
+            c += 1;
+        }
+    }
+
+    fn increment_selected_index(&mut self) {
+        self.selected_index =
+            (self.selected_index + 1).min(self.matching_executable_indexes.len() - 1);
+        info!("Selected index: {}", self.selected_index);
+    }
+
+    fn decrement_selected_index(&mut self) {
+        if self.selected_index > 0 {
+            self.selected_index -= 1;
+        }
+        info!("selected index: {}", self.selected_index);
+    }
+
+    fn get_selected_executable_file_path(&self) -> &str {
+        &self.executables[self.matching_executable_indexes[self.selected_index]].file_path
+    }
+
+    fn get_executable_file_path(&self, index: usize) -> Option<&str> {
+        if index < self.matching_executable_indexes.len() {
+            return Some(
+                &self.executables[self.matching_executable_indexes[self.selected_index]].file_path,
+            );
+        }
+        None
     }
 }
 
@@ -284,34 +348,21 @@ impl ApplicationHandler for App {
             } => {
                 if event.state.is_pressed() {
                     match event.logical_key {
+                        winit::keyboard::Key::Named(NamedKey::Control) => {
+                            self.state.ctrl_pressed = true;
+                        }
                         winit::keyboard::Key::Named(NamedKey::Enter) => {
-                            let mut scored_executables: Vec<(Executable, f64)> =
-                                Vec::with_capacity(self.state.executables.len());
-                            for executable in &self.state.executables {
-                                let display_name = executable.get_display_name();
-                                let score;
-                                if display_name.contains(&self.state.search_entry) {
-                                    score = 1.0;
-                                } else {
-                                    score = strsim::sorensen_dice(
-                                        &self.state.search_entry,
-                                        display_name,
-                                    )
-                                    .abs();
-                                }
-                                scored_executables.push((executable.clone(), score));
-                            }
-
-                            scored_executables.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-                            let scored_executables: Vec<(Executable, f64)> =
-                                scored_executables.into_iter().rev().take(10).collect();
-                            info!("The executables are:");
-                            scored_executables.iter().for_each(|(a, b)| {
-                                info!("{} - Score: {}", a.get_display_name(), b)
-                            });
-                            run_executable(&scored_executables[0].0.file_path);
+                            run_executable(self.state.get_selected_executable_file_path());
                             event_loop.exit();
                         }
+
+                        winit::keyboard::Key::Named(NamedKey::ArrowUp) => {
+                            self.state.increment_selected_index();
+                        }
+                        winit::keyboard::Key::Named(NamedKey::ArrowDown) => {
+                            self.state.decrement_selected_index();
+                        }
+
                         winit::keyboard::Key::Named(NamedKey::Backspace) => {
                             self.state.search_backspace()
                         }
@@ -319,12 +370,38 @@ impl ApplicationHandler for App {
                             self.state.append_to_search(" ")
                         }
                         winit::keyboard::Key::Character(c) => {
+                            if self.state.ctrl_pressed {
+                                let executable_file_path = match c.as_str() {
+                                    "1" => self.state.get_executable_file_path(0),
+                                    "2" => self.state.get_executable_file_path(1),
+                                    "3" => self.state.get_executable_file_path(2),
+                                    "4" => self.state.get_executable_file_path(3),
+                                    "5" => self.state.get_executable_file_path(4),
+                                    "6" => self.state.get_executable_file_path(5),
+                                    "7" => self.state.get_executable_file_path(6),
+                                    "8" => self.state.get_executable_file_path(7),
+                                    "9" => self.state.get_executable_file_path(8),
+                                    "0" => self.state.get_executable_file_path(9),
+                                    _ => None,
+                                };
+                                if let Some(file_path) = executable_file_path {
+                                    run_executable(file_path);
+                                    event_loop.exit();
+                                }
+                            }
                             self.state.append_to_search(c.as_str())
                         }
                         _ => {}
                     };
 
                     window.request_redraw();
+                } else {
+                    match event.logical_key {
+                        winit::keyboard::Key::Named(NamedKey::Control) => {
+                            self.state.ctrl_pressed = false;
+                        }
+                        _ => {}
+                    };
                 }
             }
 
@@ -347,6 +424,7 @@ pub fn app_main(executables: Vec<Executable>) {
 }
 
 fn run_executable(command: &str) {
+    info!("Launching: {}", command);
     let r = unsafe {
         Command::new(command)
             .pre_exec(|| {

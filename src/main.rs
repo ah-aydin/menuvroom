@@ -3,12 +3,7 @@ mod config;
 mod executable;
 
 use log::{error, info};
-use std::{
-    env, fs,
-    os::unix::{fs::PermissionsExt, process::CommandExt},
-    path::Path,
-    process::{self, Command},
-};
+use std::{env, fs, os::unix::fs::PermissionsExt, path::Path, process};
 
 use app::app_main;
 use config::{load_config, Config};
