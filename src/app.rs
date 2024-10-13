@@ -49,6 +49,10 @@ impl AppState {
         self.selected_index = 0;
         self.matching_executable_indexes.clear();
 
+        if self.search_entry.is_empty() {
+            return;
+        }
+
         for i in 0..self.executables.len() {
             let display_name = self.executables[i].get_display_name();
             if display_name == &self.search_entry {
@@ -99,6 +103,33 @@ impl AppState {
             );
         }
         None
+    }
+
+    fn get_matching_executable_text_buffers(
+        &self,
+        font_system: &mut glyphon::FontSystem,
+        width: f32,
+        height: f32,
+    ) -> Vec<glyphon::Buffer> {
+        let mut text_buffers = Vec::with_capacity(self.matching_executable_indexes.len());
+        for index in &self.matching_executable_indexes {
+            let executable = &self.executables[*index];
+
+            let mut text_buffer =
+                glyphon::Buffer::new(font_system, glyphon::Metrics::new(30.0, 42.0));
+
+            text_buffer.set_size(font_system, Some(width), Some(height));
+            text_buffer.set_text(
+                font_system,
+                executable.get_display_name(),
+                glyphon::Attrs::new().family(glyphon::Family::Monospace),
+                glyphon::Shaping::Advanced,
+            );
+            text_buffer.shape_until_scroll(font_system, false);
+            text_buffers.push(text_buffer);
+        }
+
+        text_buffers
     }
 }
 
@@ -239,7 +270,7 @@ impl ApplicationHandler for App {
         _window_id: winit::window::WindowId,
         event: winit::event::WindowEvent,
     ) {
-        let Some(state) = &mut self.window_state else {
+        let Some(window_state) = &mut self.window_state else {
             return;
         };
 
@@ -254,9 +285,9 @@ impl ApplicationHandler for App {
             viewport,
             atlas,
             text_renderer,
-            text_buffer,
+            text_buffer: search_text_buffer,
             ..
-        } = state;
+        } = window_state;
 
         let AppState { search_entry, .. } = &self.state;
 
@@ -273,12 +304,58 @@ impl ApplicationHandler for App {
                         height: surface_config.height,
                     },
                 );
-                text_buffer.set_text(
+
+                let physical_width =
+                    (window.inner_size().width as f64 * window.scale_factor()) as f32;
+                let physical_height =
+                    (window.inner_size().height as f64 * window.scale_factor()) as f32;
+
+                search_text_buffer.set_text(
                     font_system,
                     search_entry.as_str(),
                     glyphon::Attrs::new().family(glyphon::Family::Monospace),
                     glyphon::Shaping::Advanced,
                 );
+
+                let mut text_areas = Vec::new();
+                text_areas.push(TextArea {
+                    buffer: search_text_buffer,
+                    left: 10.0,
+                    top: 10.0,
+                    scale: 1.0,
+                    bounds: glyphon::TextBounds {
+                        left: 0,
+                        top: 0,
+                        right: 1080,
+                        bottom: 1920,
+                    },
+                    default_color: glyphon::Color::rgb(255, 255, 255),
+                    custom_glyphs: &[],
+                });
+
+                let text_buffers = self.state.get_matching_executable_text_buffers(
+                    font_system,
+                    physical_width,
+                    physical_height,
+                );
+                let mut top = 10.0;
+                for text_buffer in &text_buffers {
+                    top += 42.0;
+                    text_areas.push(TextArea {
+                        buffer: text_buffer,
+                        left: 10.0,
+                        top,
+                        scale: 1.0,
+                        bounds: glyphon::TextBounds {
+                            left: 0,
+                            top: 0,
+                            right: 1080,
+                            bottom: 1920,
+                        },
+                        default_color: glyphon::Color::rgb(255, 255, 255),
+                        custom_glyphs: &[],
+                    });
+                }
 
                 text_renderer
                     .prepare(
@@ -287,20 +364,7 @@ impl ApplicationHandler for App {
                         font_system,
                         atlas,
                         viewport,
-                        [TextArea {
-                            buffer: text_buffer,
-                            left: 10.0,
-                            top: 10.0,
-                            scale: 1.0,
-                            bounds: glyphon::TextBounds {
-                                left: 0,
-                                top: 0,
-                                right: 600,
-                                bottom: 160,
-                            },
-                            default_color: glyphon::Color::rgb(255, 255, 255),
-                            custom_glyphs: &[],
-                        }],
+                        text_areas,
                         swash_cache,
                     )
                     .expect("Failed to prepare text renderer");
