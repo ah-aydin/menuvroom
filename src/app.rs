@@ -61,9 +61,6 @@ impl AppState {
             if display_name.contains(&self.search_entry) {
                 self.matching_executable_indexes.push(i);
             }
-            if self.matching_executable_indexes.len() >= 8 {
-                break;
-            }
         }
 
         info!("The executables are:");
@@ -92,28 +89,54 @@ impl AppState {
         info!("selected index: {}", self.selected_index);
     }
 
-    fn get_selected_executable_file_path(&self) -> &str {
-        &self.executables[self.matching_executable_indexes[self.selected_index]].file_path
+    fn get_selected_executable_file_path(&self) -> Option<&str> {
+        if self.selected_index >= self.matching_executable_indexes.len() {
+            return None;
+        }
+        Some(&self.executables[self.matching_executable_indexes[self.selected_index]].file_path)
     }
 
     fn get_executable_file_path(&self, index: usize) -> Option<&str> {
         if index < self.matching_executable_indexes.len() {
-            return Some(
-                &self.executables[self.matching_executable_indexes[self.selected_index]].file_path,
-            );
+            return Some(&self.executables[self.matching_executable_indexes[index]].file_path);
         }
         None
     }
 
-    fn get_matching_executable_text_buffers(
+    fn get_text_buffers(
         &self,
         font_system: &mut glyphon::FontSystem,
         width: f32,
         height: f32,
     ) -> Vec<glyphon::Buffer> {
-        let mut text_buffers = Vec::with_capacity(self.matching_executable_indexes.len());
-        for index in &self.matching_executable_indexes {
-            let executable = &self.executables[*index];
+        let mut text_buffers = Vec::with_capacity(self.matching_executable_indexes.len() + 1);
+
+        let mut search_entry_text_buffer =
+            glyphon::Buffer::new(font_system, glyphon::Metrics::new(30.0, 42.0));
+
+        search_entry_text_buffer.set_size(font_system, Some(width), Some(height));
+        search_entry_text_buffer.set_text(
+            font_system,
+            &self.search_entry,
+            glyphon::Attrs::new().family(glyphon::Family::Monospace),
+            glyphon::Shaping::Advanced,
+        );
+        search_entry_text_buffer.shape_until_scroll(font_system, false);
+        text_buffers.push(search_entry_text_buffer);
+
+        fn get_index_hint(i: usize) -> String {
+            if i <= 8 {
+                return format!("(Ctrl+{i})");
+            } else if i == 9 {
+                return format!("(Ctrl+0)");
+            } else {
+                return "".to_string();
+            }
+        }
+
+        for i in 0..self.matching_executable_indexes.len() {
+            let index = self.matching_executable_indexes[i];
+            let executable = &self.executables[index];
 
             let mut text_buffer =
                 glyphon::Buffer::new(font_system, glyphon::Metrics::new(30.0, 42.0));
@@ -121,7 +144,7 @@ impl AppState {
             text_buffer.set_size(font_system, Some(width), Some(height));
             text_buffer.set_text(
                 font_system,
-                executable.get_display_name(),
+                &format!("{} {}", executable.get_display_name(), get_index_hint(i)),
                 glyphon::Attrs::new().family(glyphon::Family::Monospace),
                 glyphon::Shaping::Advanced,
             );
@@ -144,7 +167,6 @@ struct WindowState {
     viewport: glyphon::Viewport,
     atlas: glyphon::TextAtlas,
     text_renderer: glyphon::TextRenderer,
-    text_buffer: glyphon::Buffer,
 
     window: Arc<Window>,
 }
@@ -152,7 +174,6 @@ struct WindowState {
 impl WindowState {
     async fn new(window: Arc<Window>) -> Self {
         let physical_size = window.inner_size();
-        let scale_factor = window.scale_factor();
 
         // Set up surface
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
@@ -188,7 +209,7 @@ impl WindowState {
         surface.configure(&device, &surface_config);
 
         // Set up text renderer
-        let mut font_system = glyphon::FontSystem::new();
+        let font_system = glyphon::FontSystem::new();
         let swash_cache = glyphon::SwashCache::new();
         let cache = glyphon::Cache::new(&device);
         let viewport = glyphon::Viewport::new(&device, &cache);
@@ -199,24 +220,6 @@ impl WindowState {
             wgpu::MultisampleState::default(),
             None,
         );
-        let mut text_buffer =
-            glyphon::Buffer::new(&mut font_system, glyphon::Metrics::new(30.0, 42.0));
-
-        let physical_width = (physical_size.width as f64 * scale_factor) as f32;
-        let physical_height = (physical_size.height as f64 * scale_factor) as f32;
-
-        text_buffer.set_size(
-            &mut font_system,
-            Some(physical_width),
-            Some(physical_height),
-        );
-        text_buffer.set_text(
-            &mut font_system,
-            "Hello world!\nText renderer is working",
-            glyphon::Attrs::new().family(glyphon::Family::Monospace),
-            glyphon::Shaping::Advanced,
-        );
-        text_buffer.shape_until_scroll(&mut font_system, false);
 
         Self {
             device,
@@ -228,7 +231,6 @@ impl WindowState {
             viewport,
             atlas,
             text_renderer,
-            text_buffer,
             window,
         }
     }
@@ -285,11 +287,8 @@ impl ApplicationHandler for App {
             viewport,
             atlas,
             text_renderer,
-            text_buffer: search_text_buffer,
             ..
         } = window_state;
-
-        let AppState { search_entry, .. } = &self.state;
 
         match event {
             WindowEvent::CloseRequested => {
@@ -310,37 +309,19 @@ impl ApplicationHandler for App {
                 let physical_height =
                     (window.inner_size().height as f64 * window.scale_factor()) as f32;
 
-                search_text_buffer.set_text(
-                    font_system,
-                    search_entry.as_str(),
-                    glyphon::Attrs::new().family(glyphon::Family::Monospace),
-                    glyphon::Shaping::Advanced,
-                );
-
                 let mut text_areas = Vec::new();
-                text_areas.push(TextArea {
-                    buffer: search_text_buffer,
-                    left: 10.0,
-                    top: 10.0,
-                    scale: 1.0,
-                    bounds: glyphon::TextBounds {
-                        left: 0,
-                        top: 0,
-                        right: 1080,
-                        bottom: 1920,
-                    },
-                    default_color: glyphon::Color::rgb(255, 255, 255),
-                    custom_glyphs: &[],
-                });
-
-                let text_buffers = self.state.get_matching_executable_text_buffers(
-                    font_system,
-                    physical_width,
-                    physical_height,
-                );
+                let text_buffers =
+                    self.state
+                        .get_text_buffers(font_system, physical_width, physical_height);
                 let mut top = 10.0;
+                let mut index = 0;
                 for text_buffer in &text_buffers {
-                    top += 42.0;
+                    let color;
+                    if index - 1 == self.state.selected_index {
+                        color = glyphon::Color::rgb(255, 0, 0);
+                    } else {
+                        color = glyphon::Color::rgb(255, 255, 255);
+                    }
                     text_areas.push(TextArea {
                         buffer: text_buffer,
                         left: 10.0,
@@ -352,9 +333,11 @@ impl ApplicationHandler for App {
                             right: 1080,
                             bottom: 1920,
                         },
-                        default_color: glyphon::Color::rgb(255, 255, 255),
+                        default_color: color,
                         custom_glyphs: &[],
                     });
+                    top += 42.0;
+                    index += 1;
                 }
 
                 text_renderer
@@ -415,16 +398,23 @@ impl ApplicationHandler for App {
                         winit::keyboard::Key::Named(NamedKey::Control) => {
                             self.state.ctrl_pressed = true;
                         }
+
                         winit::keyboard::Key::Named(NamedKey::Enter) => {
-                            run_executable(self.state.get_selected_executable_file_path());
+                            if let Some(file_path) = self.state.get_selected_executable_file_path()
+                            {
+                                run_executable(file_path);
+                            }
+                            event_loop.exit();
+                        }
+                        winit::keyboard::Key::Named(NamedKey::Escape) => {
                             event_loop.exit();
                         }
 
                         winit::keyboard::Key::Named(NamedKey::ArrowUp) => {
-                            self.state.increment_selected_index();
+                            self.state.decrement_selected_index();
                         }
                         winit::keyboard::Key::Named(NamedKey::ArrowDown) => {
-                            self.state.decrement_selected_index();
+                            self.state.increment_selected_index();
                         }
 
                         winit::keyboard::Key::Named(NamedKey::Backspace) => {
@@ -433,9 +423,10 @@ impl ApplicationHandler for App {
                         winit::keyboard::Key::Named(NamedKey::Space) => {
                             self.state.append_to_search(" ")
                         }
+
                         winit::keyboard::Key::Character(c) => {
                             if self.state.ctrl_pressed {
-                                let executable_file_path = match c.as_str() {
+                                let file_path = match c.as_str() {
                                     "1" => self.state.get_executable_file_path(0),
                                     "2" => self.state.get_executable_file_path(1),
                                     "3" => self.state.get_executable_file_path(2),
@@ -448,7 +439,7 @@ impl ApplicationHandler for App {
                                     "0" => self.state.get_executable_file_path(9),
                                     _ => None,
                                 };
-                                if let Some(file_path) = executable_file_path {
+                                if let Some(file_path) = file_path {
                                     run_executable(file_path);
                                     event_loop.exit();
                                 }
