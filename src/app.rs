@@ -126,7 +126,7 @@ impl AppState {
 
         fn get_index_hint(i: usize) -> String {
             if i <= 8 {
-                return format!("(Ctrl+{i})");
+                return format!("(Ctrl+{})", i + 1);
             } else if i == 9 {
                 return format!("(Ctrl+0)");
             } else {
