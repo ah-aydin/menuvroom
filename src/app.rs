@@ -1,9 +1,9 @@
 mod window_options;
 
-use std::{io, os::unix::process::CommandExt, process::Command, sync::Arc};
+use std::{io, os::unix::process::CommandExt, path::Path, process::Command, sync::Arc};
 
 use glyphon::TextArea;
-use log::info;
+use log::{error, info};
 use window_options::WindowAttributes as WindowOptions;
 use winit::{
     application::ApplicationHandler,
@@ -14,22 +14,26 @@ use winit::{
     window::Window,
 };
 
-use crate::executable::Executable;
+use crate::config::Config;
 
 struct AppState {
     search_entry: String,
-    executables: Vec<Executable>,
+    config: Config,
+    paths: Vec<String>,
+    executables: Vec<String>,
     matching_executable_indexes: Vec<usize>,
     selected_index: usize,
     ctrl_pressed: bool,
 }
 
 impl AppState {
-    fn new(executables: Vec<Executable>) -> Self {
+    fn new(config: Config, paths: Vec<String>, executables: Vec<String>) -> Self {
         Self {
             search_entry: String::with_capacity(255),
-            matching_executable_indexes: Vec::with_capacity(8),
+            config,
+            paths,
             executables,
+            matching_executable_indexes: Vec::with_capacity(8),
             selected_index: 0,
             ctrl_pressed: false,
         }
@@ -54,8 +58,8 @@ impl AppState {
         }
 
         for i in 0..self.executables.len() {
-            let display_name = self.executables[i].get_display_name();
-            if display_name == &self.search_entry {
+            let display_name = &self.executables[i];
+            if *display_name == self.search_entry {
                 self.matching_executable_indexes.insert(0, i);
             }
             if display_name.contains(&self.search_entry) {
@@ -66,12 +70,7 @@ impl AppState {
         info!("The executables are:");
         let mut c = 0;
         for i in &self.matching_executable_indexes {
-            info!(
-                "{}: {} - {}",
-                c,
-                self.executables[*i].get_display_name(),
-                self.executables[*i].file_path
-            );
+            info!("{}: {}", c, self.executables[*i]);
             c += 1;
         }
     }
@@ -89,16 +88,16 @@ impl AppState {
         info!("selected index: {}", self.selected_index);
     }
 
-    fn get_selected_executable_file_path(&self) -> Option<&str> {
+    fn get_selected_executable(&self) -> Option<&str> {
         if self.selected_index >= self.matching_executable_indexes.len() {
             return None;
         }
-        Some(&self.executables[self.matching_executable_indexes[self.selected_index]].file_path)
+        Some(&self.executables[self.matching_executable_indexes[self.selected_index]])
     }
 
-    fn get_executable_file_path(&self, index: usize) -> Option<&str> {
+    fn get_executable(&self, index: usize) -> Option<&str> {
         if index < self.matching_executable_indexes.len() {
-            return Some(&self.executables[self.matching_executable_indexes[index]].file_path);
+            return Some(&self.executables[self.matching_executable_indexes[index]]);
         }
         None
     }
@@ -144,7 +143,7 @@ impl AppState {
             text_buffer.set_size(font_system, Some(width), Some(height));
             text_buffer.set_text(
                 font_system,
-                &format!("{} {}", executable.get_display_name(), get_index_hint(i)),
+                &format!("{} {}", executable, get_index_hint(i)),
                 glyphon::Attrs::new().family(glyphon::Family::Monospace),
                 glyphon::Shaping::Advanced,
             );
@@ -400,9 +399,8 @@ impl ApplicationHandler for App {
                         }
 
                         winit::keyboard::Key::Named(NamedKey::Enter) => {
-                            if let Some(file_path) = self.state.get_selected_executable_file_path()
-                            {
-                                run_executable(file_path);
+                            if let Some(executable) = self.state.get_selected_executable() {
+                                run_executable(&self.state.paths, executable);
                             }
                             event_loop.exit();
                         }
@@ -426,21 +424,21 @@ impl ApplicationHandler for App {
 
                         winit::keyboard::Key::Character(c) => {
                             if self.state.ctrl_pressed {
-                                let file_path = match c.as_str() {
-                                    "1" => self.state.get_executable_file_path(0),
-                                    "2" => self.state.get_executable_file_path(1),
-                                    "3" => self.state.get_executable_file_path(2),
-                                    "4" => self.state.get_executable_file_path(3),
-                                    "5" => self.state.get_executable_file_path(4),
-                                    "6" => self.state.get_executable_file_path(5),
-                                    "7" => self.state.get_executable_file_path(6),
-                                    "8" => self.state.get_executable_file_path(7),
-                                    "9" => self.state.get_executable_file_path(8),
-                                    "0" => self.state.get_executable_file_path(9),
+                                let executable = match c.as_str() {
+                                    "1" => self.state.get_executable(0),
+                                    "2" => self.state.get_executable(1),
+                                    "3" => self.state.get_executable(2),
+                                    "4" => self.state.get_executable(3),
+                                    "5" => self.state.get_executable(4),
+                                    "6" => self.state.get_executable(5),
+                                    "7" => self.state.get_executable(6),
+                                    "8" => self.state.get_executable(7),
+                                    "9" => self.state.get_executable(8),
+                                    "0" => self.state.get_executable(9),
                                     _ => None,
                                 };
-                                if let Some(file_path) = file_path {
-                                    run_executable(file_path);
+                                if let Some(executable) = executable {
+                                    run_executable(&self.state.paths, executable);
                                     event_loop.exit();
                                 }
                             }
@@ -465,20 +463,21 @@ impl ApplicationHandler for App {
     }
 }
 
-pub fn app_main(executables: Vec<Executable>) {
-    let event_loop = EventLoop::new().unwrap();
-    event_loop.set_control_flow(ControlFlow::Wait);
+fn run_executable(directories: &Vec<String>, executable: &str) {
+    let mut command = None;
+    for dir in directories {
+        let full_path = format!("{}/{}", dir.clone(), executable);
+        if Path::new(&full_path).exists() {
+            command = Some(full_path);
+            break;
+        }
+    }
+    if command.is_none() {
+        error!("Failed to find executable");
+        std::process::exit(1);
+    }
 
-    let mut app = App {
-        state: AppState::new(executables),
-        window_state: None,
-        window_options: WindowOptions::new(),
-    };
-
-    event_loop.run_app(&mut app).unwrap();
-}
-
-fn run_executable(command: &str) {
+    let command = command.unwrap();
     info!("Launching: {}", command);
     let r = unsafe {
         Command::new(command)
@@ -491,4 +490,17 @@ fn run_executable(command: &str) {
     if r.is_err() {
         info!("Failed to spawn process");
     }
+}
+
+pub fn app_main(config: Config, paths: Vec<String>, executables: Vec<String>) {
+    let event_loop = EventLoop::new().unwrap();
+    event_loop.set_control_flow(ControlFlow::Wait);
+
+    let mut app = App {
+        state: AppState::new(config, paths, executables),
+        window_state: None,
+        window_options: WindowOptions::new(),
+    };
+
+    event_loop.run_app(&mut app).unwrap();
 }

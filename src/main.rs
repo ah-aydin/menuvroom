@@ -1,13 +1,18 @@
 mod app;
 mod config;
-mod executable;
+
+static CACHE_FILE_NAME: &'static str = "/executables";
 
 use log::{error, info};
-use std::{env, fs, os::unix::fs::PermissionsExt, path::Path, process};
+use std::{
+    env, fs,
+    os::unix::fs::{MetadataExt, PermissionsExt},
+    path::Path,
+    process,
+};
 
 use app::app_main;
-use config::{load_config, Config};
-use executable::Executable;
+use config::Config;
 
 fn get_binary_dirs(config: &Config) -> Vec<String> {
     let path_var = match env::var("PATH") {
@@ -35,7 +40,54 @@ fn get_binary_dirs(config: &Config) -> Vec<String> {
     paths
 }
 
-fn get_executables(dir: &str) -> Result<Vec<Executable>, ()> {
+fn should_invalidate_cache(config: &Config, executable_dirs: &Vec<String>) -> bool {
+    let cache_file = config.cache_dir.clone() + CACHE_FILE_NAME;
+    let cache_file_path = Path::new(&cache_file);
+
+    // If cache files does not exist create it
+    if !cache_file_path.exists() {
+        info!("Cache file does not exist, creating a new one");
+        match cache_file_path.parent() {
+            Some(parent) => match fs::create_dir_all(parent) {
+                Err(_) => {
+                    error!("Failed to create missing parent directory for '{cache_file}'");
+                    process::exit(1);
+                }
+                _ => {}
+            },
+            None => {
+                error!("Could not get parent directory for '{cache_file}'");
+                process::exit(1);
+            }
+        }
+        match fs::OpenOptions::new().create(true).open(&cache_file) {
+            Err(_) => {
+                error!("Failed to create missing config file '{cache_file}'");
+                process::exit(1);
+            }
+            _ => {}
+        };
+        return true;
+    }
+
+    // If cache file is not up-to-date
+    let cache_last_update_time = cache_file_path.metadata().unwrap().mtime();
+    for executable_dir in executable_dirs {
+        let path = Path::new(executable_dir);
+        if !path.exists() {
+            continue;
+        }
+        if path.metadata().unwrap().mtime() > cache_last_update_time {
+            info!("Cache file is not up-to-date");
+            return true;
+        }
+    }
+
+    info!("Cache file is up-to-date");
+    false
+}
+
+fn get_executables(dir: &str) -> Result<Vec<String>, ()> {
     info!("Collecting from dir: {}", dir);
 
     let path = Path::new(dir);
@@ -75,7 +127,14 @@ fn get_executables(dir: &str) -> Result<Vec<Executable>, ()> {
             let metadata = metadata.unwrap();
             let permissions = metadata.permissions();
             if permissions.mode() & 0o100 != 0 {
-                executables.push(Executable::new(format!("{}", entry.path().display())));
+                executables.push(
+                    Path::new(&entry.path().display().to_string())
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                );
             }
         }
     }
@@ -85,19 +144,19 @@ fn get_executables(dir: &str) -> Result<Vec<Executable>, ()> {
 fn main() -> Result<(), i32> {
     env_logger::init();
 
-    let config = load_config();
+    let config = Config::new();
     let paths = get_binary_dirs(&config);
 
-    // TODO introduce caching
-    let executables: Vec<Executable> = paths
+    let mut executables: Vec<String> = paths
         .iter()
         .map(|path| get_executables(path))
         .filter(|executables_result| executables_result.is_ok())
         .map(|executable_result| executable_result.unwrap())
         .flatten()
         .collect();
+    executables.dedup();
 
-    app_main(executables);
+    app_main(config, paths, executables);
 
     Ok(())
 }
