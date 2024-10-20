@@ -1,11 +1,13 @@
 mod app;
 mod config;
 
-static CACHE_FILE_NAME: &'static str = "/executables";
+static CACHE_FILE_NAME: &'static str = "/executables.txt";
 
 use log::{error, info};
 use std::{
-    env, fs,
+    env,
+    fs::{self, File},
+    io::{BufRead, BufReader, Write},
     os::unix::fs::{MetadataExt, PermissionsExt},
     path::Path,
     process,
@@ -60,9 +62,14 @@ fn should_invalidate_cache(config: &Config, executable_dirs: &Vec<String>) -> bo
                 process::exit(1);
             }
         }
-        match fs::OpenOptions::new().create(true).open(&cache_file) {
-            Err(_) => {
-                error!("Failed to create missing config file '{cache_file}'");
+        match fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&cache_file)
+        {
+            Err(err) => {
+                error!("{:?}", err);
+                error!("Failed to create missing cache file '{cache_file}'");
                 process::exit(1);
             }
             _ => {}
@@ -147,14 +154,39 @@ fn main() -> Result<(), i32> {
     let config = Config::new();
     let paths = get_binary_dirs(&config);
 
-    let mut executables: Vec<String> = paths
-        .iter()
-        .map(|path| get_executables(path))
-        .filter(|executables_result| executables_result.is_ok())
-        .map(|executable_result| executable_result.unwrap())
-        .flatten()
-        .collect();
-    executables.dedup();
+    let mut executables: Vec<String>;
+    if should_invalidate_cache(&config, &paths) {
+        executables = paths
+            .iter()
+            .map(|path| get_executables(path))
+            .filter(|executables_result| executables_result.is_ok())
+            .map(|executable_result| executable_result.unwrap())
+            .flatten()
+            .collect();
+        executables.dedup();
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .open(config.cache_dir.clone() + CACHE_FILE_NAME)
+            .unwrap();
+        match file.write_all(executables.join("\n").as_bytes()) {
+            Err(_) => {
+                error!("Failed to update cache file");
+                process::exit(1);
+            }
+            _ => {}
+        };
+    } else {
+        executables = vec![];
+        let file = File::open(config.cache_dir.clone() + CACHE_FILE_NAME).unwrap();
+        for line_result in BufReader::new(file).lines() {
+            let entry = line_result.unwrap();
+            if entry.contains(' ') {
+                error!("Entry '{entry}' contains spaces.");
+                continue;
+            }
+            executables.push(entry);
+        }
+    }
 
     app_main(config, paths, executables);
 
