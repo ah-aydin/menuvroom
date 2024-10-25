@@ -18,7 +18,39 @@ use log::{error, info};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ConfigFile {
+struct FontColor {
+    r: u8,
+    g: u8,
+    b: u8,
+}
+
+impl FontColor {
+    fn to_glyphon_color(&self) -> glyphon::Color {
+        glyphon::Color::rgb(self.r, self.g, self.b)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct BgColor {
+    r: f64,
+    g: f64,
+    b: f64,
+    a: f64,
+}
+
+impl BgColor {
+    fn to_wgpu_color(&self) -> wgpu::Color {
+        wgpu::Color {
+            r: self.r,
+            g: self.g,
+            b: self.b,
+            a: self.a,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ConfigFile {
     extra_directories: Option<Vec<String>>,
     ignored_directories: Option<Vec<String>>,
     cache_dir: Option<String>,
@@ -27,17 +59,32 @@ pub struct ConfigFile {
     window_height: Option<u32>,
     window_pos_x: Option<i32>,
     window_pos_y: Option<i32>,
+
+    font_color: Option<FontColor>,
+    font_color_highlighted: Option<FontColor>,
+    font_size: Option<f32>,
+    line_height: Option<f32>,
+
+    bg_color: Option<BgColor>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Config {
     pub extra_directories: Vec<String>,
     pub ignored_directories: Vec<String>,
     pub cache_dir: String,
+
     pub window_width: u32,
     pub window_height: u32,
     pub window_pos_x: i32,
     pub window_pos_y: i32,
+
+    pub font_color: glyphon::Color,
+    pub font_color_highlighted: glyphon::Color,
+    pub font_size: f32,
+    pub line_height: f32,
+
+    pub bg_color: wgpu::Color,
 }
 
 impl Config {
@@ -141,6 +188,27 @@ impl Config {
             window_height: config_file.window_height.unwrap_or(810),
             window_pos_x: config_file.window_pos_x.unwrap_or(240),
             window_pos_y: config_file.window_pos_y.unwrap_or(135),
+
+            font_color: config_file
+                .font_color
+                .map(|fc| fc.to_glyphon_color())
+                .unwrap_or(glyphon::Color::rgb(255, 255, 255)),
+            font_color_highlighted: config_file
+                .font_color_highlighted
+                .map(|fc| fc.to_glyphon_color())
+                .unwrap_or(glyphon::Color::rgb(255, 0, 0)),
+            font_size: config_file.font_size.unwrap_or(30.0),
+            line_height: config_file.font_size.unwrap_or(42.0),
+
+            bg_color: config_file
+                .bg_color
+                .map(|bgc| bgc.to_wgpu_color())
+                .unwrap_or(wgpu::Color {
+                    r: 0.15,
+                    g: 0.15,
+                    b: 0.15,
+                    a: 0.8,
+                }),
         }
     }
 }

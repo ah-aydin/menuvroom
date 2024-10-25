@@ -106,16 +106,20 @@ impl AppState {
         width: f32,
         height: f32,
     ) -> Vec<glyphon::Buffer> {
+        let font = glyphon::Family::Monospace;
+        let font_size = self.config.font_size;
+        let line_height = self.config.line_height;
+
         let mut text_buffers = Vec::with_capacity(self.matching_executable_indexes.len() + 1);
 
         let mut search_entry_text_buffer =
-            glyphon::Buffer::new(font_system, glyphon::Metrics::new(30.0, 42.0));
+            glyphon::Buffer::new(font_system, glyphon::Metrics::new(font_size, line_height));
 
         search_entry_text_buffer.set_size(font_system, Some(width), Some(height));
         search_entry_text_buffer.set_text(
             font_system,
             &self.search_entry,
-            glyphon::Attrs::new().family(glyphon::Family::Monospace),
+            glyphon::Attrs::new().family(font),
             glyphon::Shaping::Advanced,
         );
         search_entry_text_buffer.shape_until_scroll(font_system, false);
@@ -136,13 +140,13 @@ impl AppState {
             let executable = &self.executables[index];
 
             let mut text_buffer =
-                glyphon::Buffer::new(font_system, glyphon::Metrics::new(30.0, 42.0));
+                glyphon::Buffer::new(font_system, glyphon::Metrics::new(font_size, line_height));
 
             text_buffer.set_size(font_system, Some(width), Some(height));
             text_buffer.set_text(
                 font_system,
                 &format!("{} {}", executable, get_index_hint(i)),
-                glyphon::Attrs::new().family(glyphon::Family::Monospace),
+                glyphon::Attrs::new().family(font),
                 glyphon::Shaping::Advanced,
             );
             text_buffer.shape_until_scroll(font_system, false);
@@ -315,9 +319,9 @@ impl ApplicationHandler for App {
                 for text_buffer in &text_buffers {
                     let color;
                     if index - 1 == self.state.selected_index {
-                        color = glyphon::Color::rgb(255, 0, 0);
+                        color = self.state.config.font_color_highlighted;
                     } else {
-                        color = glyphon::Color::rgb(255, 255, 255);
+                        color = self.state.config.font_color;
                     }
                     text_areas.push(TextArea {
                         buffer: text_buffer,
@@ -327,8 +331,8 @@ impl ApplicationHandler for App {
                         bounds: glyphon::TextBounds {
                             left: 0,
                             top: 0,
-                            right: 1080,
-                            bottom: 1920,
+                            right: physical_width as i32,
+                            bottom: physical_height as i32,
                         },
                         default_color: color,
                         custom_glyphs: &[],
@@ -363,12 +367,7 @@ impl ApplicationHandler for App {
                         view: &view,
                         resolve_target: None,
                         ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: 0.15,
-                                g: 0.15,
-                                b: 0.15,
-                                a: 0.8,
-                            }),
+                            load: wgpu::LoadOp::Clear(self.state.config.bg_color),
                             store: wgpu::StoreOp::Store,
                         },
                     })],
@@ -439,8 +438,9 @@ impl ApplicationHandler for App {
                                     run_executable(&self.state.paths, executable);
                                     event_loop.exit();
                                 }
+                            } else {
+                                self.state.append_to_search(c.as_str())
                             }
-                            self.state.append_to_search(c.as_str())
                         }
                         _ => {}
                     };
