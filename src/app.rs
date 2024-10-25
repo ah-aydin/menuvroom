@@ -1,16 +1,7 @@
-mod window_options;
-
-use std::{
-    io,
-    os::unix::process::CommandExt,
-    path::Path,
-    process::Command,
-    sync::Arc,
-};
+use std::{io, os::unix::process::CommandExt, path::Path, process::Command, sync::Arc};
 
 use glyphon::TextArea;
 use log::{error, info};
-use window_options::WindowAttributes as WindowOptions;
 use winit::{
     application::ApplicationHandler,
     dpi::{LogicalPosition, LogicalSize},
@@ -245,21 +236,21 @@ impl WindowState {
 struct App {
     state: AppState,
     window_state: Option<WindowState>,
-    window_options: WindowOptions,
 }
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        info!("Creating window with options {:?}", self.window_options);
+        let Config {
+            window_width,
+            window_height,
+            window_pos_x,
+            window_pos_y,
+            ..
+        } = self.state.config;
+        info!("Creating window with size ({window_width}, {window_height}) at position ({window_pos_x}, {window_pos_y})");
         let window_attributes = Window::default_attributes()
-            .with_inner_size(LogicalSize::new(
-                self.window_options.width,
-                self.window_options.height,
-            ))
-            .with_position(LogicalPosition::new(
-                self.window_options.pos_x,
-                self.window_options.pos_y,
-            ))
+            .with_inner_size(LogicalSize::new(window_width, window_height))
+            .with_position(LogicalPosition::new(window_pos_x, window_pos_y))
             .with_title("Menu Vroom")
             .with_resizable(false)
             .with_decorations(false)
@@ -503,8 +494,7 @@ pub fn app_main() {
     let config = Config::new();
     let paths = executable_utils::get_binary_dirs(&config);
 
-    let executables: Vec<String> =
-        executable_utils::get_executables_for_config_and_paths(&config, &paths);
+    let executables = executable_utils::get_executables_for_config_and_paths(&config, &paths);
 
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Wait);
@@ -512,7 +502,6 @@ pub fn app_main() {
     let mut app = App {
         state: AppState::new(config, paths, executables),
         window_state: None,
-        window_options: WindowOptions::new(),
     };
 
     event_loop.run_app(&mut app).unwrap();

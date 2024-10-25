@@ -22,13 +22,22 @@ pub struct ConfigFile {
     extra_directories: Option<Vec<String>>,
     ignored_directories: Option<Vec<String>>,
     cache_dir: Option<String>,
+
+    window_width: Option<u32>,
+    window_height: Option<u32>,
+    window_pos_x: Option<i32>,
+    window_pos_y: Option<i32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Config {
     pub extra_directories: Vec<String>,
     pub ignored_directories: Vec<String>,
     pub cache_dir: String,
+    pub window_width: u32,
+    pub window_height: u32,
+    pub window_pos_x: i32,
+    pub window_pos_y: i32,
 }
 
 impl Config {
@@ -110,8 +119,6 @@ impl Config {
         }
         let config_file = config_file.unwrap();
 
-        let extra_directories = config_file.extra_directories.unwrap_or(vec![]);
-        let ignored_directories = config_file.ignored_directories.unwrap_or(vec![]);
         let cache_dir = config_file
             .cache_dir
             .or_else(|| {
@@ -126,9 +133,14 @@ impl Config {
             })
             .unwrap();
         Config {
-            extra_directories,
-            ignored_directories,
+            extra_directories: config_file.extra_directories.unwrap_or(vec![]),
+            ignored_directories: config_file.ignored_directories.unwrap_or(vec![]),
             cache_dir,
+            // These values are for a 1080p display to cover 2 thirds of the screen
+            window_width: config_file.window_width.unwrap_or(1440),
+            window_height: config_file.window_height.unwrap_or(810),
+            window_pos_x: config_file.window_pos_x.unwrap_or(240),
+            window_pos_y: config_file.window_pos_y.unwrap_or(135),
         }
     }
 }

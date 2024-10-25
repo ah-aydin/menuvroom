@@ -96,7 +96,7 @@ pub fn get_executables_for_config_and_paths(config: &Config, paths: &Vec<String>
     if should_invalidate_cache(&config, &paths) {
         executables = paths
             .iter()
-            .map(|path| get_executables(path))
+            .map(|path| get_executables_from_directory(path))
             .filter(|executables_result| executables_result.is_ok())
             .map(|executable_result| executable_result.unwrap())
             .flatten()
@@ -129,7 +129,7 @@ pub fn get_executables_for_config_and_paths(config: &Config, paths: &Vec<String>
     executables
 }
 
-fn get_executables(dir: &str) -> Result<Vec<String>, ()> {
+fn get_executables_from_directory(dir: &str) -> Result<Vec<String>, ()> {
     info!("Collecting from dir: {}", dir);
 
     let path = Path::new(dir);
