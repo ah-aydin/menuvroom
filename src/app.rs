@@ -1,6 +1,12 @@
 mod window_options;
 
-use std::{io, os::unix::process::CommandExt, path::Path, process::Command, sync::Arc};
+use std::{
+    io,
+    os::unix::process::CommandExt,
+    path::Path,
+    process::Command,
+    sync::Arc,
+};
 
 use glyphon::TextArea;
 use log::{error, info};
@@ -15,6 +21,7 @@ use winit::{
 };
 
 use crate::config::Config;
+use crate::executable_utils;
 
 struct AppState {
     search_entry: String,
@@ -492,7 +499,13 @@ fn run_executable(directories: &Vec<String>, executable: &str) {
     }
 }
 
-pub fn app_main(config: Config, paths: Vec<String>, executables: Vec<String>) {
+pub fn app_main() {
+    let config = Config::new();
+    let paths = executable_utils::get_binary_dirs(&config);
+
+    let executables: Vec<String> =
+        executable_utils::get_executables_for_config_and_paths(&config, &paths);
+
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Wait);
 
