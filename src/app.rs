@@ -337,7 +337,7 @@ impl ApplicationHandler for App {
                         default_color: color,
                         custom_glyphs: &[],
                     });
-                    top += 42.0;
+                    top += self.state.config.line_height;
                     index += 1;
                 }
 
