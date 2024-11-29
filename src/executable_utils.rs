@@ -101,6 +101,7 @@ pub fn get_executables_for_config_and_paths(config: &Config, paths: &Vec<String>
             .map(|executable_result| executable_result.unwrap())
             .flatten()
             .collect();
+        executables.sort();
         executables.dedup();
         let mut file = fs::OpenOptions::new()
             .write(true)

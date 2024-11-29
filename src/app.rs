@@ -59,8 +59,7 @@ impl AppState {
             let display_name = &self.executables[i];
             if *display_name == self.search_entry {
                 self.matching_executable_indexes.insert(0, i);
-            }
-            if display_name.contains(&self.search_entry) {
+            } else if display_name.contains(&self.search_entry) {
                 self.matching_executable_indexes.push(i);
             }
         }
@@ -183,7 +182,7 @@ impl WindowState {
             .expect("Failed to create surface");
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::LowPower,
+                power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
             })
