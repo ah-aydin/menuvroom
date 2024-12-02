@@ -16,16 +16,20 @@ Example config (place it in `~/.config/menuvroom`). All values are optional.
 ```json
 {
   "extra_directories": [
-    "/var/lib/flatpak/exports/bin"
+    "/var/lib/flatpak/exports/bin",
+    "/usr/share/applications",
+    "/home/user/.local/share/applications"
   ],
   "ignored_directories": [
     "/usr/local/games"
   ],
   // Will automatically create a file called `executables.txt`
-  "cache_dir": "~/.cache/menuvroom",
+  "cache_dir": "~/.cache/menuvroom", // This is where it defaults if not provided
 
   // If set to false will not include binaries that it finds
-  "include_binaries": true,
+  "include_binaries": true, // default true
+  // If set to false will not include desktop files that it finds
+  "include_desktop_files": true, // default true
 
   "window_width": 1000,
   "window_height": 600,
