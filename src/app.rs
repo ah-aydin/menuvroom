@@ -1,4 +1,4 @@
-use std::{io, os::unix::process::CommandExt, path::Path, process::Command, sync::Arc};
+use std::{fs, io, os::unix::process::CommandExt, path::Path, process::Command, sync::Arc};
 
 use glyphon::TextArea;
 use log::{error, info};
@@ -11,8 +11,8 @@ use winit::{
     window::Window,
 };
 
-use crate::config::Config;
 use crate::executable_utils;
+use crate::{config::Config, executable_utils::CACHE_FILE_NAME};
 
 struct AppState {
     search_entry: String,
@@ -436,6 +436,18 @@ impl ApplicationHandler for App {
                                 if let Some(executable) = executable {
                                     run_executable(&self.state.paths, executable);
                                     event_loop.exit();
+                                }
+                                if c.as_str() == "i" {
+                                    info!("Invalidating cache");
+                                    if fs::remove_file(
+                                        self.state.config.cache_dir.clone() + CACHE_FILE_NAME,
+                                    )
+                                    .is_ok()
+                                    {
+                                        info!("Invalieded cache");
+                                    } else {
+                                        error!("Failed to invalidate cache");
+                                    }
                                 }
                             } else {
                                 self.state.append_to_search(c.as_str())
