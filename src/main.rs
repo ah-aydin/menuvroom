@@ -1,6 +1,6 @@
 mod app;
 mod config;
-mod executable_utils;
+mod executables;
 
 use app::app_main;
 

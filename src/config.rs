@@ -56,6 +56,7 @@ struct ConfigFile {
     cache_dir: Option<String>,
 
     include_binaries: Option<bool>,
+    include_desktip_files: Option<bool>,
 
     window_width: Option<u32>,
     window_height: Option<u32>,
@@ -77,6 +78,7 @@ pub struct Config {
     pub cache_dir: String,
 
     pub include_binaries: bool,
+    pub include_desktop_files: bool,
 
     pub window_width: u32,
     pub window_height: u32,
@@ -189,6 +191,7 @@ impl Config {
             cache_dir,
 
             include_binaries: config_file.include_binaries.unwrap_or(true),
+            include_desktop_files: config_file.include_desktip_files.unwrap_or(true),
 
             // These values are for a 1080p display to cover 2 thirds of the screen
             window_width: config_file.window_width.unwrap_or(1440),

@@ -11,21 +11,21 @@ use winit::{
     window::Window,
 };
 
-use crate::executable_utils;
-use crate::{config::Config, executable_utils::CACHE_FILE_NAME};
+use crate::executables::{self, Executable};
+use crate::{config::Config, executables::CACHE_FILE_NAME};
 
 struct AppState {
     search_entry: String,
     config: Config,
     paths: Vec<String>,
-    executables: Vec<String>,
+    executables: Vec<Executable>,
     matching_executable_indexes: Vec<usize>,
     selected_index: usize,
     ctrl_pressed: bool,
 }
 
 impl AppState {
-    fn new(config: Config, paths: Vec<String>, executables: Vec<String>) -> Self {
+    fn new(config: Config, paths: Vec<String>, executables: Vec<Executable>) -> Self {
         Self {
             search_entry: String::with_capacity(255),
             config,
@@ -56,7 +56,7 @@ impl AppState {
         }
 
         for i in 0..self.executables.len() {
-            let display_name = &self.executables[i];
+            let display_name = &self.executables[i].get_display_text();
             if *display_name == self.search_entry {
                 self.matching_executable_indexes.insert(0, i);
             } else if display_name.contains(&self.search_entry) {
@@ -67,7 +67,7 @@ impl AppState {
         info!("The executables are:");
         let mut c = 0;
         for i in &self.matching_executable_indexes {
-            info!("{}: {}", c, self.executables[*i]);
+            info!("{}: {}", c, self.executables[*i].get_display_text());
             c += 1;
         }
     }
@@ -85,14 +85,14 @@ impl AppState {
         info!("selected index: {}", self.selected_index);
     }
 
-    fn get_selected_executable(&self) -> Option<&str> {
+    fn get_selected_executable(&self) -> Option<&Executable> {
         if self.selected_index >= self.matching_executable_indexes.len() {
             return None;
         }
         Some(&self.executables[self.matching_executable_indexes[self.selected_index]])
     }
 
-    fn get_executable(&self, index: usize) -> Option<&str> {
+    fn get_executable(&self, index: usize) -> Option<&Executable> {
         if index < self.matching_executable_indexes.len() {
             return Some(&self.executables[self.matching_executable_indexes[index]]);
         }
@@ -144,7 +144,7 @@ impl AppState {
             text_buffer.set_size(font_system, Some(width), Some(height));
             text_buffer.set_text(
                 font_system,
-                &format!("{} {}", executable, get_index_hint(i)),
+                &format!("{} {}", executable.get_display_text(), get_index_hint(i)),
                 glyphon::Attrs::new().family(font),
                 glyphon::Shaping::Advanced,
             );
@@ -396,7 +396,11 @@ impl ApplicationHandler for App {
 
                         winit::keyboard::Key::Named(NamedKey::Enter) => {
                             if let Some(executable) = self.state.get_selected_executable() {
-                                run_executable(&self.state.paths, executable);
+                                if executable.is_desktop_file() {
+                                    run_command(&executable.command);
+                                } else {
+                                    run_binary(&self.state.paths, &executable.command);
+                                }
                             }
                             event_loop.exit();
                         }
@@ -434,7 +438,11 @@ impl ApplicationHandler for App {
                                     _ => None,
                                 };
                                 if let Some(executable) = executable {
-                                    run_executable(&self.state.paths, executable);
+                                    if executable.is_desktop_file() {
+                                        run_command(&executable.command);
+                                    } else {
+                                        run_binary(&self.state.paths, &executable.command);
+                                    }
                                     event_loop.exit();
                                 }
                                 if c.as_str() == "i" {
@@ -472,7 +480,7 @@ impl ApplicationHandler for App {
     }
 }
 
-fn run_executable(directories: &Vec<String>, executable: &str) {
+fn run_binary(directories: &Vec<String>, executable: &str) {
     let mut command = None;
     for dir in directories {
         let full_path = format!("{}/{}", dir.clone(), executable);
@@ -486,26 +494,32 @@ fn run_executable(directories: &Vec<String>, executable: &str) {
         std::process::exit(1);
     }
 
-    let command = command.unwrap();
+    run_command(&command.unwrap());
+}
+
+fn run_command(command: &str) {
     info!("Launching: {}", command);
-    let r = unsafe {
-        Command::new(command)
+    unsafe {
+        // TODO get prefered shell for user or find a way to pass on the PATh to this Command
+        let result = Command::new("zsh")
+            .arg("-c")
+            .arg(&command.split_whitespace().collect::<Vec<&str>>().join(" "))
             .pre_exec(|| {
                 nix::unistd::setsid().map_err(|_| io::Error::from(io::ErrorKind::Other))?;
                 Ok(())
             })
-            .spawn()
+            .spawn();
+        if result.is_err() {
+            error!("Failed to spawn process {:?}", result.err().unwrap());
+        }
     };
-    if r.is_err() {
-        info!("Failed to spawn process");
-    }
 }
 
 pub fn app_main() {
     let config = Config::new();
-    let paths = executable_utils::get_binary_dirs(&config);
+    let paths = executables::get_binary_dirs(&config);
 
-    let executables = executable_utils::get_executables_for_config_and_paths(&config, &paths);
+    let executables = executables::get_executables_for_config_and_paths(&config, &paths);
 
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Wait);
