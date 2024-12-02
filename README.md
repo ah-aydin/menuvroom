@@ -24,6 +24,9 @@ Example config (place it in `~/.config/menuvroom`). All values are optional.
   // Will automatically create a file called `executables.txt`
   "cache_dir": "~/.cache/menuvroom",
 
+  // If set to false will not include binaries that it finds
+  "include_binaries": true,
+
   "window_width": 1000,
   "window_height": 600,
   "window_pos_x": 30,

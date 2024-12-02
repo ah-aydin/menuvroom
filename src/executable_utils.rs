@@ -96,7 +96,7 @@ pub fn get_executables_for_config_and_paths(config: &Config, paths: &Vec<String>
     if should_invalidate_cache(&config, &paths) {
         executables = paths
             .iter()
-            .map(|path| get_executables_from_directory(path))
+            .map(|path| get_executables_from_directory(path, config.include_binaries))
             .filter(|executables_result| executables_result.is_ok())
             .map(|executable_result| executable_result.unwrap())
             .flatten()
@@ -130,7 +130,7 @@ pub fn get_executables_for_config_and_paths(config: &Config, paths: &Vec<String>
     executables
 }
 
-fn get_executables_from_directory(dir: &str) -> Result<Vec<String>, ()> {
+fn get_executables_from_directory(dir: &str, include_binaries: bool) -> Result<Vec<String>, ()> {
     info!("Collecting from dir: {}", dir);
 
     let path = Path::new(dir);
@@ -159,6 +159,10 @@ fn get_executables_from_directory(dir: &str) -> Result<Vec<String>, ()> {
             continue;
         }
         let file_type = file_type.unwrap();
+
+        if !entry.path().ends_with(".desktop") && !include_binaries {
+            continue;
+        }
 
         if file_type.is_file() || file_type.is_symlink() {
             let metadata = entry.metadata();

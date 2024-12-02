@@ -55,6 +55,8 @@ struct ConfigFile {
     ignored_directories: Option<Vec<String>>,
     cache_dir: Option<String>,
 
+    include_binaries: Option<bool>,
+
     window_width: Option<u32>,
     window_height: Option<u32>,
     window_pos_x: Option<i32>,
@@ -73,6 +75,8 @@ pub struct Config {
     pub extra_directories: Vec<String>,
     pub ignored_directories: Vec<String>,
     pub cache_dir: String,
+
+    pub include_binaries: bool,
 
     pub window_width: u32,
     pub window_height: u32,
@@ -183,6 +187,9 @@ impl Config {
             extra_directories: config_file.extra_directories.unwrap_or(vec![]),
             ignored_directories: config_file.ignored_directories.unwrap_or(vec![]),
             cache_dir,
+
+            include_binaries: config_file.include_binaries.unwrap_or(true),
+
             // These values are for a 1080p display to cover 2 thirds of the screen
             window_width: config_file.window_width.unwrap_or(1440),
             window_height: config_file.window_height.unwrap_or(810),
