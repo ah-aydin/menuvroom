@@ -1,4 +1,7 @@
-use std::{fs, io, os::unix::process::CommandExt, path::Path, process::Command, sync::Arc};
+use std::{
+    collections::HashMap, env, fs, io, os::unix::process::CommandExt, path::Path, process::Command,
+    sync::Arc,
+};
 
 use glyphon::TextArea;
 use log::{error, info};
@@ -500,10 +503,24 @@ fn run_binary(directories: &Vec<String>, executable: &str) {
 fn run_command(command: &str) {
     info!("Launching: {}", command);
     unsafe {
-        // TODO get prefered shell for user or find a way to pass on the PATh to this Command
-        let result = Command::new("zsh")
-            .arg("-c")
-            .arg(&command.split_whitespace().collect::<Vec<&str>>().join(" "))
+        let split: Vec<&str> = command.split_whitespace().collect::<Vec<&str>>();
+
+        let binary = split[0].to_string();
+
+        let mut envs: HashMap<String, String> = env::vars().collect();
+        let mut args: Vec<String> = Vec::with_capacity(split.len() - 1);
+        split.iter().skip(1).for_each(|value| {
+            if value.contains("=") {
+                let split = value.split_once("=").unwrap();
+                envs.insert(split.0.to_string(), split.1.to_string());
+            } else {
+                args.push(value.to_string());
+            }
+        });
+
+        let result = Command::new(binary)
+            .args(args)
+            .envs(envs)
             .pre_exec(|| {
                 nix::unistd::setsid().map_err(|_| io::Error::from(io::ErrorKind::Other))?;
                 Ok(())
