@@ -196,7 +196,12 @@ pub fn get_executables_for_config_and_paths(
         executables = vec![];
         let file = File::open(config.cache_dir.clone() + CACHE_FILE_NAME).unwrap();
         for line_result in BufReader::new(file).lines() {
-            let entry = line_result.unwrap();
+            let entry = line_result;
+            if entry.is_err() {
+                error!("{:?}", entry.err());
+                continue;
+            }
+            let entry = entry.unwrap();
             if entry.starts_with("D:") {
                 let cached_info = entry.split(":").nth(1);
                 if cached_info.is_none() {
